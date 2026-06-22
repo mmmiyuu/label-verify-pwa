@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="標籤比對" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <title>標籤比對系統</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #ffffff; --bg2: #f5f5f5; --bg3: #eeeeee;
+      --text: #111111; --text2: #555555; --text3: #999999;
+      --border: rgba(0,0,0,0.12); --border2: rgba(0,0,0,0.22);
+      --success-bg: #eaf3de; --success: #3b6d11;
+      --danger-bg: #fcebeb;  --danger: #a32d2d;
+      --radius: 10px; --radius-lg: 14px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a1a; --bg2: #242424; --bg3: #2e2e2e;
+        --text: #f0f0f0; --text2: #aaaaaa; --text3: #666666;
+        --border: rgba(255,255,255,0.10); --border2: rgba(255,255,255,0.20);
+        --success-bg: #173404; --success: #97c459;
+        --danger-bg: #501313; --danger: #f09595;
+      }
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; }
+    #app { max-width: 480px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+    header { padding: 1rem 1.25rem 0.75rem; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; gap: 10px; }
+    header h1 { font-size: 17px; font-weight: 600; }
+    header p { font-size: 12px; color: var(--text3); margin-top: 1px; }
+    .progress-bar { display: flex; padding: 0.75rem 1.25rem 0; gap: 6px; }
+    .progress-bar span { flex: 1; height: 3px; border-radius: 2px; background: var(--bg3); transition: background 0.3s; }
+    .progress-bar span.done { background: var(--text); }
+    .progress-bar span.active { background: var(--text2); }
+    .content { flex: 1; padding: 1rem 1.25rem; overflow-y: auto; }
+    .step { display: none; } .step.active { display: block; }
+    .step-label { font-size: 12px; color: var(--text3); font-weight: 500; letter-spacing: 0.05em; margin-bottom: 0.4rem; }
+    .step-title { font-size: 20px; font-weight: 600; margin-bottom: 0.25rem; }
+    .step-desc { font-size: 14px; color: var(--text2); margin-bottom: 1.25rem; line-height: 1.5; }
+    .card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    #qr-video-wrap { position: relative; width: 100%; border-radius: var(--radius); overflow: hidden; background: #000; aspect-ratio: 1; margin-bottom: 1rem; }
+    #qr-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #qr-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    .scan-frame { width: 60%; aspect-ratio: 1; border: 2px solid rgba(255,255,255,0.8); border-radius: 8px; box-shadow: 0 0 0 999px rgba(0,0,0,0.4); }
+    #qr-canvas { display: none; }
+    #qr-status { font-size: 13px; color: var(--text2); text-align: center; margin-bottom: 1rem; min-height: 20px; }
+    #ocr-video-wrap { position: relative; width: 100%; border-radius: var(--radius); overflow: hidden; background: #000; aspect-ratio: 4/3; margin-bottom: 1rem; }
+    #ocr-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #ocr-canvas { display: none; }
+    #ocr-preview { width: 100%; border-radius: var(--radius); margin-bottom: 0.75rem; display: none; }
+    .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+    .type-btn { padding: 1rem 0.75rem; border-radius: var(--radius); border: 0.5px solid var(--border2); background: var(--bg); color: var(--text); cursor: pointer; text-align: center; font-size: 14px; font-weight: 500; font-family: inherit; }
+    .type-btn .icon { font-size: 22px; display: block; margin-bottom: 6px; }
+    .type-btn.selected { border: 2px solid var(--text); }
+    .btn { display: block; width: 100%; padding: 13px; border-radius: var(--radius); font-size: 15px; font-weight: 500; font-family: inherit; cursor: pointer; border: 0.5px solid var(--border2); background: var(--bg); color: var(--text); margin-bottom: 0.75rem; text-align: center; -webkit-tap-highlight-color: transparent; }
+    .btn:active { opacity: 0.7; }
+    .btn-primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+    .btn-ghost { border-color: var(--border); color: var(--text2); }
+    #ocr-progress { font-size: 13px; color: var(--text2); text-align: center; margin: 0.5rem 0; min-height: 20px; }
+    .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+    .metric { background: var(--bg2); border-radius: var(--radius); padding: 0.75rem; text-align: center; }
+    .metric-num { font-size: 26px; font-weight: 600; }
+    .metric-label { font-size: 12px; color: var(--text2); margin-top: 2px; }
+    .num-ok { color: var(--success); } .num-fail { color: var(--danger); }
+    .result-item { padding: 10px 0; border-bottom: 0.5px solid var(--border); }
+    .result-item:last-child { border-bottom: none; }
+    .result-top { display: flex; justify-content: space-between; align-items: center; }
+    .result-name { font-size: 14px; font-weight: 500; }
+    .badge { font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 20px; }
+    .badge-ok { background: var(--success-bg); color: var(--success); }
+    .badge-fail { background: var(--danger-bg); color: var(--danger); }
+    .result-detail { font-size: 12px; color: var(--text2); margin-top: 4px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .result-ocr.mismatch { color: var(--danger); }
+    .all-pass-banner { background: var(--success-bg); color: var(--success); border-radius: var(--radius); padding: 0.75rem 1rem; font-size: 14px; font-weight: 500; text-align: center; margin-bottom: 1rem; }
+    .has-fail-banner { background: var(--danger-bg); color: var(--danger); border-radius: var(--radius); padding: 0.75rem 1rem; font-size: 14px; font-weight: 500; text-align: center; margin-bottom: 1rem; }
+    .divider { text-align: center; font-size: 13px; color: var(--text3); margin: 0.5rem 0 0.75rem; }
+    textarea { width: 100%; min-height: 80px; padding: 10px; font-size: 13px; font-family: monospace; border-radius: var(--radius); border: 0.5px solid var(--border2); background: var(--bg2); color: var(--text); resize: vertical; display: block; margin-bottom: 0.5rem; }
+    .hint { font-size: 12px; color: var(--text3); margin-bottom: 1rem; line-height: 1.5; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+      <rect width="32" height="32" rx="8" fill="var(--text)"/>
+      <rect x="7" y="7" width="8" height="8" rx="1.5" fill="var(--bg)"/>
+      <rect x="17" y="7" width="8" height="8" rx="1.5" fill="var(--bg)"/>
+      <rect x="7" y="17" width="8" height="8" rx="1.5" fill="var(--bg)"/>
+      <rect x="19" y="19" width="2" height="2" fill="var(--bg)"/>
+      <rect x="23" y="19" width="2" height="2" fill="var(--bg)"/>
+      <rect x="19" y="23" width="2" height="2" fill="var(--bg)"/>
+      <rect x="23" y="23" width="2" height="2" fill="var(--bg)"/>
+    </svg>
+    <div>
+      <h1>標籤比對系統</h1>
+      <p>掃 QR Code × OCR 自動驗證</p>
+    </div>
+  </header>
+
+  <div class="progress-bar">
+    <span id="p1" class="active"></span>
+    <span id="p2"></span>
+    <span id="p3"></span>
+  </div>
+
+  <div class="content">
+
+    <!-- STEP 1 -->
+    <div class="step active" id="step1">
+      <p class="step-label">步驟 1 / 3</p>
+      <p class="step-title">掃描工單 QR Code</p>
+      <p class="step-desc">對準紙本一上的 QR Code，取得所有比對基準值</p>
+      <div id="qr-video-wrap">
+        <video id="qr-video" playsinline autoplay muted></video>
+        <div id="qr-overlay"><div class="scan-frame"></div></div>
+      </div>
+      <canvas id="qr-canvas"></canvas>
+      <p id="qr-status">啟動相機中…</p>
+      <div class="divider">— 或手動輸入 JSON —</div>
+      <textarea id="qr-manual" placeholder='{"料號":"85.10C37.012","滿箱PCS":500,"包材":50,"製造日":"2026-05-25","備註":"6052803"}'></textarea>
+      <p class="hint">QR Code 內容格式：JSON，需含 料號、滿箱PCS、包材、製造日、備註</p>
+      <button class="btn btn-ghost" onclick="parseManualQR()">使用手動輸入內容</button>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step" id="step2">
+      <p class="step-label">步驟 2 / 3</p>
+      <p class="step-title">拍攝標籤</p>
+      <p class="step-desc">先選擇標籤類型，再拍照進行 OCR 辨識</p>
+      <div class="type-grid">
+        <button class="type-btn selected" id="btn-outer" onclick="selectType('outer')">
+          <span class="icon">📦</span>外標籤
+        </button>
+        <button class="type-btn" id="btn-inner" onclick="selectType('inner')">
+          <span class="icon">🏷️</span>內標籤
+        </button>
+      </div>
+      <div id="ocr-video-wrap">
+        <video id="ocr-video" playsinline autoplay muted></video>
+      </div>
+      <canvas id="ocr-canvas"></canvas>
+      <button class="btn btn-primary" id="capture-btn" onclick="captureOCR()">📷 拍照辨識</button>
+      <img id="ocr-preview" alt="拍攝預覽" />
+      <p id="ocr-progress"></p>
+      <div class="divider">— 或手動貼上 OCR 文字 —</div>
+      <textarea id="ocr-manual" placeholder="Part No. 85.10C37.012&#10;Qty 500&#10;Production Date 2026-05-25&#10;Lot No. 6052803"></textarea>
+      <button class="btn btn-ghost" onclick="parseManualOCR()">使用手動輸入內容</button>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step" id="step3">
+      <p class="step-label">步驟 3 / 3</p>
+      <p class="step-title" id="result-title">比對結果</p>
+      <div id="result-banner"></div>
+      <div class="summary" id="summary"></div>
+      <div class="card" id="result-list"></div>
+
+      <!-- 原始 OCR 文字（除錯用） -->
+      <details style="margin-bottom:0.75rem;">
+        <summary style="font-size:13px; color:var(--text3); cursor:pointer; padding:4px 0;">▸ 查看原始 OCR 辨識文字</summary>
+        <pre id="raw-ocr-output" style="margin-top:8px; font-size:12px; font-family:monospace; background:var(--bg2); border-radius:var(--radius); padding:10px; white-space:pre-wrap; word-break:break-all; color:var(--text2); border:0.5px solid var(--border);"></pre>
+      </details>
+
+      <button class="btn btn-primary" onclick="goStep2Again()">繼續掃下一張標籤</button>
+      <button class="btn btn-ghost" onclick="resetAll()">重新開始</button>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════
+// ★ 在這裡填入你的 Google Vision API Key ★
+const GOOGLE_VISION_API_KEY = 'AIza在這裡填入你的API_KEY';
+// ═══════════════════════════════════════════
+
+// 欄位對應表：ocrKeys = 標籤上的欄位名稱（小寫），refKey = QR Code 裡的 key
+const FIELD_MAP = {
+  outer: [
+    { ocrKeys: ['part no', 'part no.'], label: 'Part No.',        refKey: '料號',   mode: 'string' },
+    { ocrKeys: ['qty'],                 label: 'Qty',              refKey: '滿箱PCS', mode: 'number' },
+    { ocrKeys: ['production date'],     label: 'Production Date',  refKey: '製造日', mode: 'date'   },
+    { ocrKeys: ['lot no', 'lot no.'],   label: 'Lot No.',          refKey: '備註',   mode: 'string' },
+  ],
+  inner: [
+    { ocrKeys: ['part no', 'part no.'], label: 'Part No.',        refKey: '料號',   mode: 'string' },
+    { ocrKeys: ['qty'],                 label: 'Qty',              refKey: '包材',   mode: 'number' },
+    { ocrKeys: ['production date'],     label: 'Production Date',  refKey: '製造日', mode: 'date'   },
+    { ocrKeys: ['lot no', 'lot no.'],   label: 'Lot No.',          refKey: '備註',   mode: 'string' },
+  ]
+};
+
+/* ── State ── */
+let qrData = null;
+let labelType = 'outer';
+let qrStream = null;
+let ocrStream = null;
+let qrScanInterval = null;
+
+/* ── Progress ── */
+function setProgress(n) {
+  ['p1','p2','p3'].forEach((id,i) => {
+    document.getElementById(id).className = i+1 < n ? 'done' : i+1 === n ? 'active' : '';
+  });
+}
+function showStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step'+n).classList.add('active');
+  setProgress(n);
+}
+
+/* ── Step 1: QR Scan ── */
+async function startQRCamera() {
+  const statusEl = document.getElementById('qr-status');
+  try {
+    qrStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    const video = document.getElementById('qr-video');
+    video.srcObject = qrStream;
+    video.play();
+    statusEl.textContent = '對準工單上的 QR Code…';
+    startQRScan();
+  } catch(e) {
+    statusEl.textContent = '無法存取相機，請使用手動輸入';
+  }
+}
+
+function startQRScan() {
+  const video = document.getElementById('qr-video');
+  const canvas = document.getElementById('qr-canvas');
+  const ctx = canvas.getContext('2d');
+  const statusEl = document.getElementById('qr-status');
+  qrScanInterval = setInterval(() => {
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+    if (code) {
+      clearInterval(qrScanInterval);
+      stopQRCamera();
+      try {
+        // 清除 BOM、前後空白、不可見字元
+        const cleaned = code.data
+          .replace(/^\uFEFF/, '')       // BOM
+          .replace(/[\u0000-\u001F\u007F]/g, ' ') // 控制字元換空白（保留換行會破壞 JSON）
+          .trim();
+        qrData = JSON.parse(cleaned);
+        statusEl.textContent = '✓ 辨識成功';
+        proceedToStep2();
+      } catch(e) {
+        // 顯示原始內容方便除錯
+        const preview = code.data.slice(0, 80).replace(/[^\x20-\x7E\u4E00-\u9FFF]/g, '·');
+        statusEl.textContent = `⚠ 格式錯誤，原始內容：${preview}`;
+        setTimeout(() => startQRScan(), 2000);
+      }
+    }
+  }, 200);
+}
+
+function stopQRCamera() {
+  if (qrStream) { qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
+  clearInterval(qrScanInterval);
+}
+
+function parseManualQR() {
+  const raw = document.getElementById('qr-manual').value.trim();
+  if (!raw) { alert('請輸入 QR Code 內容'); return; }
+  try {
+    qrData = JSON.parse(raw);
+    stopQRCamera();
+    proceedToStep2();
+  } catch(e) {
+    alert('JSON 格式錯誤，請確認內容');
+  }
+}
+
+function proceedToStep2() {
+  stopQRCamera();
+  showStep(2);
+  startOCRCamera();
+}
+
+/* ── Step 2: OCR ── */
+function selectType(t) {
+  labelType = t;
+  document.getElementById('btn-outer').className = 'type-btn' + (t==='outer' ? ' selected' : '');
+  document.getElementById('btn-inner').className = 'type-btn' + (t==='inner' ? ' selected' : '');
+}
+
+async function startOCRCamera() {
+  try {
+    ocrStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+    });
+    const video = document.getElementById('ocr-video');
+    video.srcObject = ocrStream;
+    video.play();
+  } catch(e) {
+    document.getElementById('ocr-progress').textContent = '無法存取相機，請手動貼上文字';
+  }
+}
+
+function stopOCRCamera() {
+  if (ocrStream) { ocrStream.getTracks().forEach(t => t.stop()); ocrStream = null; }
+}
+
+async function captureOCR() {
+  const video = document.getElementById('ocr-video');
+  const canvas = document.getElementById('ocr-canvas');
+  const preview = document.getElementById('ocr-preview');
+  const progress = document.getElementById('ocr-progress');
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+  const base64 = dataUrl.split(',')[1];
+
+  preview.src = dataUrl;
+  preview.style.display = 'block';
+  progress.textContent = '上傳辨識中…';
+
+  stopOCRCamera();
+  document.getElementById('capture-btn').textContent = '重新拍照';
+  document.getElementById('capture-btn').onclick = retakeOCR;
+
+  try {
+    const resp = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [{
+            image: { content: base64 },
+            features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }]
+          }]
+        })
+      }
+    );
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      progress.textContent = `API 錯誤：${err?.error?.message || resp.statusText}`;
+      return;
+    }
+
+    const data = await resp.json();
+    const text = data.responses?.[0]?.fullTextAnnotation?.text || '';
+
+    if (!text) {
+      progress.textContent = '未辨識到文字，請重新拍照';
+      return;
+    }
+
+    progress.textContent = '辨識完成';
+    document.getElementById('raw-ocr-output').textContent = text;
+    runCompare(text);
+
+  } catch(e) {
+    progress.textContent = `網路錯誤：${e.message}`;
+  }
+}
+
+function retakeOCR() {
+  document.getElementById('ocr-preview').style.display = 'none';
+  document.getElementById('ocr-progress').textContent = '';
+  document.getElementById('capture-btn').textContent = '📷 拍照辨識';
+  document.getElementById('capture-btn').onclick = captureOCR;
+  startOCRCamera();
+}
+
+function parseManualOCR() {
+  const text = document.getElementById('ocr-manual').value.trim();
+  if (!text) { alert('請輸入 OCR 文字'); return; }
+  stopOCRCamera();
+  document.getElementById('raw-ocr-output').textContent = text;
+  runCompare(text);
+}
+
+/* ── Compare ── */
+function normalizeDate(s) {
+  return String(s).trim().replace(/\//g,'-')
+    .replace(/(\d{4})-(\d{1,2})-(\d{1,2})/, (_,y,m,d) => y+'-'+m.padStart(2,'0')+'-'+d.padStart(2,'0'));
+}
+
+function extractNumber(s) {
+  const m = String(s).match(/[\d.]+/);
+  return m ? parseFloat(m[0]) : NaN;
+}
+
+function parseOCRText(text) {
+  const result = {};
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const fields = FIELD_MAP[labelType];
+
+  for (let i = 0; i < lines.length; i++) {
+    const lower = lines[i].toLowerCase();
+    for (const field of fields) {
+      for (const key of field.ocrKeys) {
+        if (lower.startsWith(key)) {
+          // 同行有值：Part No. 85.10C37.012
+          const inline = lines[i].slice(key.length).replace(/^[\s:.]+/, '').trim();
+          if (inline) {
+            result[field.refKey + '_ocr'] = inline;
+          } else if (i + 1 < lines.length) {
+            // 值在下一行
+            result[field.refKey + '_ocr'] = lines[i + 1].trim();
+          }
+          break;
+        }
+      }
+    }
+  }
+  return result;
+}
+
+function runCompare(ocrText) {
+  const ocr = parseOCRText(ocrText);
+  let pass = 0, fail = 0;
+  const rows = [];
+
+  for (const field of FIELD_MAP[labelType]) {
+    const refRaw = qrData[field.refKey];
+    const ocrRaw = ocr[field.refKey + '_ocr'];
+    let match = false;
+    let dispRef = refRaw ?? '—';
+    let dispOcr = ocrRaw ?? '（未辨識）';
+
+    if (refRaw !== undefined && ocrRaw !== undefined) {
+      if (field.mode === 'number') {
+        match = extractNumber(ocrRaw) === Number(refRaw);
+      } else if (field.mode === 'date') {
+        dispRef = normalizeDate(refRaw);
+        dispOcr = normalizeDate(ocrRaw);
+        match = dispRef === dispOcr;
+      } else {
+        match = String(ocrRaw).trim() === String(refRaw).trim();
+      }
+    }
+
+    if (match) pass++; else fail++;
+    rows.push({ label: field.label, dispRef, dispOcr, match });
+  }
+
+  document.getElementById('result-title').textContent =
+    (labelType === 'outer' ? '外標籤' : '內標籤') + ' 比對結果';
+
+  document.getElementById('result-banner').innerHTML = fail === 0
+    ? `<div class="all-pass-banner">✓ 全部符合，標籤驗證通過</div>`
+    : `<div class="has-fail-banner">✗ 有 ${fail} 個欄位不符，請確認</div>`;
+
+  document.getElementById('summary').innerHTML = `
+    <div class="metric"><div class="metric-num num-ok">${pass}</div><div class="metric-label">符合</div></div>
+    <div class="metric"><div class="metric-num num-fail">${fail}</div><div class="metric-label">不符合</div></div>
+    <div class="metric"><div class="metric-num">${pass+fail}</div><div class="metric-label">總欄位</div></div>
+  `;
+
+  document.getElementById('result-list').innerHTML = rows.map(r => `
+    <div class="result-item">
+      <div class="result-top">
+        <span class="result-name">${r.label}</span>
+        <span class="badge ${r.match ? 'badge-ok' : 'badge-fail'}">${r.match ? '符合' : '不符合'}</span>
+      </div>
+      <div class="result-detail">
+        <span class="result-ref">工單：${r.dispRef}</span>
+        <span class="result-sep">／</span>
+        <span class="result-ocr ${r.match ? '' : 'mismatch'}">標籤：${r.dispOcr}</span>
+      </div>
+    </div>
+  `).join('');
+
+  showStep(3);
+}
+
+function goStep2Again() {
+  showStep(2);
+  document.getElementById('ocr-preview').style.display = 'none';
+  document.getElementById('ocr-progress').textContent = '';
+  document.getElementById('capture-btn').textContent = '📷 拍照辨識';
+  document.getElementById('capture-btn').onclick = captureOCR;
+  document.getElementById('ocr-manual').value = '';
+  startOCRCamera();
+}
+
+function resetAll() {
+  qrData = null; labelType = 'outer';
+  document.getElementById('qr-manual').value = '';
+  document.getElementById('qr-status').textContent = '啟動相機中…';
+  document.getElementById('ocr-preview').style.display = 'none';
+  document.getElementById('ocr-progress').textContent = '';
+  document.getElementById('capture-btn').textContent = '📷 拍照辨識';
+  document.getElementById('capture-btn').onclick = captureOCR;
+  document.getElementById('ocr-manual').value = '';
+  document.getElementById('btn-outer').className = 'type-btn selected';
+  document.getElementById('btn-inner').className = 'type-btn';
+  showStep(1);
+  startQRCamera();
+}
+
+window.addEventListener('load', () => {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  startQRCamera();
+});
+</script>
+</body>
+</html>
